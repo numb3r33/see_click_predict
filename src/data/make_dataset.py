@@ -1,30 +1,54 @@
 # -*- coding: utf-8 -*-
-import os
-import click
-import logging
-from dotenv import find_dotenv, load_dotenv
+import pandas as pd
+import numpy as np
 
+from sklearn.preprocessing import LabelEncoder
 
-@click.command()
-@click.argument('input_filepath', type=click.Path(exists=True))
-@click.argument('output_filepath', type=click.Path())
-def main(input_filepath, output_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
-    """
-    logger = logging.getLogger(__name__)
-    logger.info('making final data set from raw data')
-
-
-if __name__ == '__main__':
-    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
-
-    # not used in this stub but often useful for finding various files
-    project_dir = os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
-
-    main()
+class Data:
+    def __init__(self, train, test):
+        self.train = train
+        self.test = test
+    
+    def concat_data(self):
+        self.data = pd.concat((self.train, self.test), axis=0)
+        return self.data
+    
+    def round_location(self):
+        self.data['latitude'] = self.data.latitude.map(np.round)
+        self.data['longitude'] = self.data.longitude.map(np.round)
+        
+        return self.data
+    
+    def fill_missing_values(self, feature, value):
+        self.data[feature] = self.data[feature].fillna(value)
+        
+        return self.data
+        
+    def encode_categorical_variable(self, feature):
+        lbl = LabelEncoder()
+        
+        lbl.fit(self.data[feature])
+        self.data[feature] = lbl.transform(self.data[feature])
+        
+        return self.data
+        
+    def get_train_test(self):
+        mask = self.data.num_votes.notnull()
+        
+        train = self.data.loc[mask]
+        test = self.data.loc[~mask]
+        
+        return train, test
+    
+    def one_hot_encode(self, feature):
+        ohe = pd.get_dummies(self.data[feature])
+        self.data = pd.concat((self.data, ohe), axis=1)
+        
+        return self.data
+    
+    def decompose_date(self):
+        self.data['month'] = self.data.created_time.dt.month
+        self.data['year'] = self.data.created_time.dt.year
+        self.data['week'] = self.data.created_time.dt.dayofweek
+        
+        return self.data
